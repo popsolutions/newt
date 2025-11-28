@@ -50,23 +50,51 @@ fi
 echo "newt instalado em: $(command -v newt)"
 echo
 
-# Pede o comando completo do newt
-echo "Cole AGORA o comando COMPLETO do newt que você quer rodar como serviço."
-echo "Exemplo:"
-echo "  newt --id 4m9umjy04ch90eb --secret ivvzf70gi1b3qngmypujcwbeodvo9t9wy0nb27dwm2qn2ho8 --endpoint https://edge.pop.uy"
-echo
-printf "Comando newt> "
+###############################################################################
+# OBTENDO O COMANDO NEWT
+###############################################################################
+NEWT_CMD=""
 
-# lê linha inteira (sem interpretar backslashes)
-read -r NEWT_CMD
+# 1) Se vierem argumentos, usamos todos os argumentos como comando
+if [ "$#" -gt 0 ]; then
+  # Junta todos os argumentos em uma única string
+  NEWT_CMD="$*"
+fi
 
+# 2) Se não veio como argumento, tenta variável de ambiente NEWT_CMD
+if [ -z "${NEWT_CMD}" ] && [ -n "${NEWT_CMD:-}" ]; then
+  NEWT_CMD="${NEWT_CMD}"
+fi
+
+# 3) Se ainda estiver vazio e estivermos em TTY, pergunta interativamente
+if [ -z "${NEWT_CMD}" ] && [ -t 0 ]; then
+  echo "Cole AGORA o comando COMPLETO do newt que você quer rodar como serviço."
+  echo "Exemplo:"
+  echo "  newt --id 4m9umjy04ch90eb --secret ivvzf70gi1b3qngmypujcwbeodvo9t9wy0nb27dwm2qn2ho8 --endpoint https://edge.pop.uy"
+  echo
+  printf "Comando newt> "
+  read -r NEWT_CMD
+fi
+
+# 4) Se mesmo assim continuar vazio, aborta
 if [ -z "${NEWT_CMD}" ]; then
-  echo "Nenhum comando newt informado. Abortando." >&2
+  echo "Nenhum comando newt informado."
+  echo
+  echo "Use, por exemplo:"
+  echo "  curl -fsSL https://raw.githubusercontent.com/popsolutions/newt/refs/heads/main/service.sh \\"
+  echo "    | bash -s -- \"newt --id SEU_ID --secret SEU_SECRET --endpoint https://edge.pop.uy\""
   exit 1
 fi
 
-WRAPPER="/usr/local/sbin/newt-agent.sh"
 echo
+echo "Comando newt que será usado no serviço:"
+echo "  ${NEWT_CMD}"
+echo
+
+###############################################################################
+# CRIA WRAPPER
+###############################################################################
+WRAPPER="/usr/local/sbin/newt-agent.sh"
 echo "Criando wrapper em ${WRAPPER}..."
 
 cat > "${WRAPPER}" <<EOF
@@ -80,6 +108,9 @@ chmod +x "${WRAPPER}"
 echo "Wrapper criado."
 echo
 
+###############################################################################
+# CRIA SERVIÇO
+###############################################################################
 if [ "$OS_FAMILY" = "debian" ]; then
   SERVICE_FILE="/etc/systemd/system/newt-agent.service"
   echo "Criando unidade systemd em ${SERVICE_FILE}..."
